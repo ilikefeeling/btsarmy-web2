@@ -25,7 +25,7 @@ export const auth = getAuth(app);
 // Only call initializeFirestore on first init; subsequent calls use getFirestore.
 export const db = isNewApp
     ? initializeFirestore(app, {
-        experimentalAutoDetectLongPolling: true,
+        experimentalForceLongPolling: true,
         cacheSizeBytes: CACHE_SIZE_UNLIMITED,
     })
     : getFirestore(app);

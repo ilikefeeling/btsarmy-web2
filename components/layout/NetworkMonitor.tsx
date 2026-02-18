@@ -20,7 +20,10 @@ export default function NetworkMonitor() {
             // Explicitly ignore AbortError — these are caused by browser extensions
             // or network retries (e.g. Firestore reconnection attempts) and are NOT
             // real offline states.
-            if (reason?.name === 'AbortError') return;
+            if (reason?.name === 'AbortError' || message.includes('AbortError')) {
+                event.preventDefault(); // Prevent logging to console if possible
+                return;
+            }
 
             const isFirestoreOffline =
                 message.includes('client is offline') ||
