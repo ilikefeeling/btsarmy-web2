@@ -10,20 +10,21 @@ interface UserProfile {
 }
 
 // Mock Database of Service Numbers (for initial testing)
+// Format: 0000-0000 (4 digits - 4 digits)
 const MOCK_SERVICE_NUMBERS = [
-    '24-70001', '24-70002', '24-70003', // 2024 enlistments
-    '13-61300', // Special admin code
-    '99-99999' // QA Test Account
+    '2470-0001', '2470-0002', '2470-0003', // 2024 enlistments
+    '0000-0000', // Special admin code
+    '9999-9999' // QA Test Account
 ];
 
 export async function verifyServiceNumber(serviceNumber: string): Promise<{ success: boolean; message: string }> {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // 1. Format Validation (YY-NXXXX)
-    const formatRegex = /^\d{2}-\d{5}$/;
+    // 1. Format Validation (0000-0000)
+    const formatRegex = /^\d{4}-\d{4}$/;
     if (!formatRegex.test(serviceNumber)) {
-        return { success: false, message: 'Invalid format. Use YY-XXXXX (e.g., 24-12345).' };
+        return { success: false, message: 'Invalid format. Use 0000-0000 (e.g., 2470-0001).' };
     }
 
     // 2. Mock Database Check

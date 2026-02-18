@@ -20,6 +20,15 @@ export default function ServiceGate({ onSuccess }: ServiceGateProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const handleServiceNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Auto-format: 0000-0000
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.length > 8) val = val.slice(0, 8);
+        if (val.length > 4) val = `${val.slice(0, 4)}-${val.slice(4)}`;
+        setServiceNumber(val);
+        if (error) setError('');
+    };
+
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
@@ -86,7 +95,8 @@ export default function ServiceGate({ onSuccess }: ServiceGateProps) {
                             type="text"
                             placeholder={t('auth.verify_placeholder')}
                             value={serviceNumber}
-                            onChange={(e) => setServiceNumber(e.target.value)}
+                            onChange={handleServiceNumberChange}
+                            maxLength={9}
                             className={cn(
                                 "w-full px-4 py-3 bg-black/40 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-300",
                                 error

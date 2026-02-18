@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -14,14 +14,23 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (Singleton pattern)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// isNewApp: true means this is the first initialization, so we can call initializeFirestore
+const isNewApp = !getApps().length;
+const app = isNewApp ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-// Use default Firestore - let Firebase SDK choose the best connection method
-// experimentalForceLongPolling was causing conflicts with Vercel's fetch wrapper
-export const db = getFirestore(app);
+// Use experimentalAutoDetectLongPolling to handle Vercel/CDN environments
+// where WebSocket connections may be blocked or unstable.
+// Only call initializeFirestore on first init; subsequent calls use getFirestore.
+export const db = isNewApp
+    ? initializeFirestore(app, {
+        experimentalAutoDetectLongPolling: true,
+        cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+    })
+    : getFirestore(app);
 
 export const storage = getStorage(app);
 export { app };
 export default app;
+
