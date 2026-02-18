@@ -19,7 +19,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
 // Initialize Firestore with long-polling (singleton-safe)
-// initializeFirestore can only be called once per app instance
+// experimentalForceLongPolling bypasses WebSocket restrictions from security software
 let db: ReturnType<typeof getFirestore>;
 try {
     db = initializeFirestore(app, {
