@@ -164,7 +164,10 @@ export async function updateUserRank(uid: string, newRank: UserProfile['rank']) 
 
 // --- Feed Operations ---
 
-export function subscribeToFeed(callback: (items: FeedItem[]) => void) {
+export function subscribeToFeed(
+    callback: (items: FeedItem[]) => void,
+    onError?: (error: Error) => void
+) {
     const q = query(
         collection(db, 'global_lounge_feed'),
         orderBy('timestamp', 'desc'),
@@ -177,6 +180,11 @@ export function subscribeToFeed(callback: (items: FeedItem[]) => void) {
             ...doc.data()
         })) as FeedItem[];
         callback(items);
+    }, (error) => {
+        console.error('subscribeToFeed error:', error);
+        // On offline/error, stop loading with empty array so UI doesn't hang
+        callback([]);
+        if (onError) onError(error);
     });
 }
 

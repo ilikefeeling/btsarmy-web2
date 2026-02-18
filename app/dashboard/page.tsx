@@ -41,6 +41,7 @@ export default function DashboardPage() {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [feed, setFeed] = useState<FeedItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [feedError, setFeedError] = useState(false);
     const [activeTab, setActiveTab] = useState<'HOT' | 'RISING' | 'NEW'>('HOT');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadContent, setUploadContent] = useState('');
@@ -85,10 +86,17 @@ export default function DashboardPage() {
 
     // Subscribe to Feed
     useEffect(() => {
-        const unsubscribe = subscribeToFeed((items) => {
-            setFeed(items);
-            setLoading(false);
-        });
+        const unsubscribe = subscribeToFeed(
+            (items) => {
+                setFeed(items);
+                setLoading(false);
+            },
+            (error) => {
+                console.error('Feed subscription error:', error);
+                setLoading(false);
+                setFeedError(true);
+            }
+        );
         return () => unsubscribe();
     }, []);
 
@@ -415,6 +423,14 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     ))
+                ) : feedError ? (
+                    <div className="col-span-full text-center py-20 space-y-3">
+                        <p className="text-red-400 font-bold">⚠️ 피드를 불러올 수 없습니다</p>
+                        <p className="text-gray-500 text-sm">네트워크 연결을 확인하고 페이지를 새로고침해 주세요.</p>
+                        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-bts-purple text-white rounded-lg text-sm font-bold hover:bg-purple-600 transition-colors">
+                            새로고침
+                        </button>
+                    </div>
                 ) : feed.length === 0 ? (
                     <div className="col-span-full text-center py-20 text-gray-500">
                         <p>{t('dashboard.no_content')}</p>
