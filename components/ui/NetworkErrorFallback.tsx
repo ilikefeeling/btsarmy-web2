@@ -1,16 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { WifiOff, ExternalLink, RefreshCw, AlertTriangle } from 'lucide-react';
+import { WifiOff, RefreshCw } from 'lucide-react';
 
 interface NetworkErrorFallbackProps {
     onRetry: () => void;
 }
 
 export default function NetworkErrorFallback({ onRetry }: NetworkErrorFallbackProps) {
-    // Try to determine if we are in an in-app browser
-    const isInApp = typeof window !== 'undefined' && /Line|Instagram|FBAN|FBAV/i.test(navigator.userAgent);
-
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 px-4 backdrop-blur-sm">
             <motion.div
@@ -29,57 +26,29 @@ export default function NetworkErrorFallback({ onRetry }: NetworkErrorFallbackPr
 
                 <div>
                     <h2 className="text-2xl font-bold text-white mb-2">
-                        Connection Blocked
+                        연결 오류
                     </h2>
                     <p className="text-gray-400 text-sm">
-                        Current network or browser settings are preventing access to the database.
+                        데이터베이스 연결에 실패했습니다. 네트워크 상태를 확인해주세요.
                     </p>
                 </div>
 
-                {isInApp && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg text-left flex gap-3 items-start">
-                        <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-                        <div className="text-xs text-yellow-200/80 space-y-1">
-                            <p className="font-semibold text-yellow-500">In-App Browser Detected</p>
-                            <p>Some features are restricted in this environment.</p>
-                            <p className="text-white mt-1">Please open in <strong>Chrome</strong> or <strong>Safari</strong>.</p>
-                        </div>
-                    </div>
-                )}
-
                 <div className="bg-white/5 p-4 rounded-lg text-left text-xs text-gray-500 space-y-2">
-                    <p className="text-gray-400 font-medium">Troubleshooting:</p>
+                    <p className="text-gray-400 font-medium">해결 방법:</p>
                     <ul className="list-disc pl-4 space-y-1">
-                        <li>Switch between <span className="text-white">Wi-Fi</span> and <span className="text-white">Mobile Data</span>.</li>
-                        <li>Disable any <span className="text-white">AdBlockers</span> or <span className="text-white">VPN</span>.</li>
-                        <li>Try reloading the page.</li>
+                        <li><span className="text-white">Wi-Fi</span>와 <span className="text-white">모바일 데이터</span>를 전환해보세요.</li>
+                        <li><span className="text-white">AdBlocker</span> 또는 <span className="text-white">VPN</span>을 비활성화해보세요.</li>
+                        <li>페이지를 새로고침해보세요.</li>
                     </ul>
                 </div>
 
-                <div className="flex flex-col gap-3 pt-2">
-                    <button
-                        onClick={onRetry}
-                        className="w-full py-3.5 bg-gradient-to-r from-bts-purple to-purple-600 hover:from-purple-600 hover:to-bts-purple text-white rounded-xl font-bold transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2"
-                    >
-                        <RefreshCw className="w-5 h-5" />
-                        Retry Connection
-                    </button>
-                    <button
-                        onClick={() => {
-                            // Attempt to open system browser via intent (Android) or window.open
-                            const url = window.location.href;
-                            window.open(url, '_system');
-                        }}
-                        className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl font-medium transition-all text-sm flex items-center justify-center gap-2"
-                    >
-                        <ExternalLink className="w-4 h-4" />
-                        Open in External Browser
-                    </button>
-                </div>
-
-                <p className="text-[10px] text-gray-700 font-mono">
-                    Code: firestore_offline_persistence_error
-                </p>
+                <button
+                    onClick={onRetry}
+                    className="w-full py-3.5 bg-gradient-to-r from-bts-purple to-purple-600 hover:from-purple-600 hover:to-bts-purple text-white rounded-xl font-bold transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2"
+                >
+                    <RefreshCw className="w-5 h-5" />
+                    다시 연결
+                </button>
             </motion.div>
         </div>
     );
