@@ -33,9 +33,10 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-import { LanguageProvider } from "@/contexts/LanguageContext";
-
 import HydrationGuard from "@/components/HydrationGuard";
+import GlobalErrorBoundary from "@/components/GlobalErrorBoundary";
+import ConsoleFilter from "@/components/ConsoleFilter";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 
 export default function RootLayout({
   children,
@@ -47,14 +48,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <HydrationGuard>
-          <LanguageProvider>
-            <AuthProvider>
-              {children}
-            </AuthProvider>
-            <Footer />
-          </LanguageProvider>
-        </HydrationGuard>
+        <ConsoleFilter />
+        <GlobalErrorBoundary>
+          <HydrationGuard>
+            <LanguageProvider>
+              <AuthProvider>
+                {children}
+              </AuthProvider>
+              <Footer />
+            </LanguageProvider>
+          </HydrationGuard>
+        </GlobalErrorBoundary>
       </body>
     </html>
   );
