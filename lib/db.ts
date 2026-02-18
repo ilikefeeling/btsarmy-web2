@@ -169,7 +169,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
         }
         return null;
     } catch (e) {
-        console.warn('getUserProfile: Direct SDK failed, trying proxy...', e);
+        console.warn('getUserProfile: Direct SDK failed, trying proxy (v2)...', e);
         try {
             const currentUser = auth.currentUser;
             if (!currentUser) throw e;
