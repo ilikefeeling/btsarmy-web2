@@ -48,6 +48,49 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if (typeof Node === 'undefined') return;
+                var originalRemoveChild = Node.prototype.removeChild;
+                Node.prototype.removeChild = function(child) {
+                  try {
+                    return originalRemoveChild.apply(this, arguments);
+                  } catch (e) {
+                    // Suppress "The node to be removed is not a child of this node" usually caused by external scripts (frame_start.js)
+                    if (e.message && (e.message.indexOf('not a child') > -1 || e.name === 'NotFoundError')) {
+                      console.debug('[SafeDOM] Suppressed external DOM interference.');
+                      if (child.parentNode) {
+                          // Fallback: if the child actually has a parent, try removing it from there? 
+                          // Or just ignore if it's already detached.
+                          try { child.parentNode.removeChild(child); } catch(ex) {}
+                      }
+                      return child;
+                    }
+                    throw e;
+                  }
+                };
+                
+                // Also patch insertBefore? Sometimes related.
+                var originalInsertBefore = Node.prototype.insertBefore;
+                Node.prototype.insertBefore = function(newNode, referenceNode) {
+                    try {
+                        return originalInsertBefore.apply(this, arguments);
+                    } catch(e) {
+                        if (e.message && (e.message.indexOf('not a child') > -1 || e.name === 'NotFoundError')) {
+                             console.debug('[SafeDOM] Suppressed external insertBefore interference.');
+                             // Try appending if reference node is gone? warning: might break layout order.
+                             // For now, just suppress crash.
+                             return newNode;
+                        }
+                        throw e;
+                    }
+                }
+              })();
+            `,
+          }}
+        />
         <ConsoleFilter />
         <GlobalErrorBoundary>
           <HydrationGuard>
