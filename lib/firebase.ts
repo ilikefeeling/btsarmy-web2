@@ -13,6 +13,17 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// Debug: Check if config is loaded
+if (typeof window !== 'undefined') {
+    console.error("Firebase Config Debug (Please Check):", {
+        apiKey: firebaseConfig.apiKey ? "Present" : "MISSING",
+        authDomain: firebaseConfig.authDomain ? "Present" : "MISSING",
+        projectId: firebaseConfig.projectId ? "Present" : "MISSING",
+        storageBucket: firebaseConfig.storageBucket ? "Present" : "MISSING",
+        appId: firebaseConfig.appId ? "Present" : "MISSING",
+    });
+}
+
 // Initialize Firebase (Singleton pattern)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
