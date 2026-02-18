@@ -30,19 +30,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
 
             if (user) {
-                // Background profile sync - non-blocking
-                // Dynamically import to avoid circular dependencies
-                import('@/lib/db').then(async ({ saveUser }) => {
-                    try {
-                        // Check if user has a valid service number email format
-                        if (user.email && user.email.endsWith('@army.bts')) {
-                            const serviceNumber = user.email.split('@')[0];
-                            await saveUser(user, serviceNumber);
-                        }
-                    } catch (error) {
-                        console.error("Failed to save user profile in background:", error);
+                // Background profile sync via API route to avoid client-side Firestore issues
+                try {
+                    if (user.email && user.email.endsWith('@army.bts')) {
+                        const serviceNumber = user.email.split('@')[0];
+                        const idToken = await user.getIdToken();
+                        // Use API route instead of direct Firestore call
+                        fetch('/api/save-user', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${idToken}`,
+                            },
+                            body: JSON.stringify({ serviceNumber }),
+                        }).catch(err => {
+                            console.warn('Background profile sync failed (non-critical):', err);
+                        });
                     }
-                });
+                } catch (error) {
+                    console.warn('Failed to get ID token for profile sync:', error);
+                }
             }
         });
 

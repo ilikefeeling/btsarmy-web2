@@ -84,20 +84,42 @@ export default function DashboardPage() {
         };
     }, [previewUrl]);
 
-    // Subscribe to Feed
+    // Subscribe to Feed with retry logic
     useEffect(() => {
-        const unsubscribe = subscribeToFeed(
-            (items) => {
-                setFeed(items);
-                setLoading(false);
-            },
-            (error) => {
-                console.error('Feed subscription error:', error);
-                setLoading(false);
-                setFeedError(true);
-            }
-        );
-        return () => unsubscribe();
+        let retryCount = 0;
+        const maxRetries = 3;
+        let unsubscribe: (() => void) | null = null;
+
+        const subscribe = () => {
+            unsubscribe = subscribeToFeed(
+                (items) => {
+                    setFeed(items);
+                    setLoading(false);
+                    setFeedError(false);
+                    retryCount = 0; // Reset on success
+                },
+                (error) => {
+                    console.error('Feed subscription error:', error);
+                    const isOfflineError = error.message?.includes('offline') || (error as { code?: string }).code === 'unavailable';
+
+                    if (isOfflineError && retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`Retrying Firestore connection (${retryCount}/${maxRetries})...`);
+                        // Retry after delay
+                        setTimeout(() => {
+                            if (unsubscribe) unsubscribe();
+                            subscribe();
+                        }, 3000 * retryCount);
+                    } else {
+                        setLoading(false);
+                        setFeedError(true);
+                    }
+                }
+            );
+        };
+
+        subscribe();
+        return () => { if (unsubscribe) unsubscribe(); };
     }, []);
 
     const handleTranslate = async (id: string, text: string) => {

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -18,20 +18,10 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-// Initialize Firestore with long-polling (singleton-safe)
-// experimentalForceLongPolling bypasses WebSocket restrictions from security software
-let db: ReturnType<typeof getFirestore>;
-try {
-    db = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-    });
-} catch {
-    // Already initialized - get the existing instance
-    db = getFirestore(app);
-}
+// Use default Firestore - let Firebase SDK choose the best connection method
+// experimentalForceLongPolling was causing conflicts with Vercel's fetch wrapper
+export const db = getFirestore(app);
 
-export { db };
 export const storage = getStorage(app);
 export { app };
 export default app;
-
