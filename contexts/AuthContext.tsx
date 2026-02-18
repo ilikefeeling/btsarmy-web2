@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
@@ -25,32 +25,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setUser(user);
-            setLoading(false);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+                setLoading(false);
 
-            if (user) {
-                // Background profile sync via API route to avoid client-side Firestore issues
+                // Background profile sync via API route
+                // Wrapped in try-catch to ensure it never affects Auth State
+                // This is where 'frame_ant.js' might cause AbortError, so we strictly isolate it.
                 try {
-                    if (user.email && user.email.endsWith('@army.bts')) {
-                        const serviceNumber = user.email.split('@')[0];
-                        const idToken = await user.getIdToken();
-                        // Use API route instead of direct Firestore call
-                        fetch('/api/save-user', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${idToken}`,
-                            },
-                            body: JSON.stringify({ serviceNumber }),
-                        }).catch(err => {
-                            console.warn('Background profile sync failed (non-critical):', err);
+                    if (currentUser.email && currentUser.email.endsWith('@army.bts')) {
+                        const serviceNumber = currentUser.email.split('@')[0];
+                        // If getIdToken fails due to connection, we just skip sync, we DON'T logout
+                        const idToken = await currentUser.getIdToken().catch(e => {
+                            console.warn('[Validation] Token fetch failed (likely network):', e);
+                            return null;
                         });
+
+                        if (idToken) {
+                            fetch('/api/save-user', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${idToken}`,
+                                },
+                                body: JSON.stringify({ serviceNumber }),
+                            }).catch(err => {
+                                // Explicitly ignore AbortError/Network Error for sync
+                                console.warn('[Validation] Background sync deferred:', err.name);
+                            });
+                        }
                     }
                 } catch (error) {
-                    console.warn('Failed to get ID token for profile sync:', error);
+                    console.warn('[Validation] Sync skipped due to error:', error);
                 }
+            } else {
+                // User is null. 
+                setUser(null);
+                setLoading(false);
             }
+        }, (error) => {
+            // Error listener for onAuthStateChanged
+            console.error('[Auth] Auth State Stream Error:', error);
+            // If an error occurs in the stream (like AbortError on initial load),
+            // we should try to keep the previous state if possible, or at least stop loading.
+            if (error.message && (error.message.includes('network') || error.message.includes('abort'))) {
+                console.warn('[Auth] Ignoring network error in auth stream.');
+            }
+            setLoading(false);
         });
 
         return () => unsubscribe();
