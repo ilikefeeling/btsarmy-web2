@@ -20,6 +20,13 @@ const app = isNewApp ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
+// Explicitly set persistence to Local Storage to prevent session loss on refresh
+// This is critical for environments where session cookies might be cleared or blocked
+import { setPersistence, browserLocalPersistence } from 'firebase/auth';
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.error("Auth Persistence Error:", error);
+});
+
 // Use experimentalAutoDetectLongPolling to handle Vercel/CDN environments
 // where WebSocket connections may be blocked or unstable.
 // Only call initializeFirestore on first init; subsequent calls use getFirestore.
