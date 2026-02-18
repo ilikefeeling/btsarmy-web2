@@ -195,24 +195,66 @@ export async function proxySetDoc(path: string, data: any, user: User, merge: bo
     return await res.json();
 }
 
-export async function proxyQuery(collectionPath: string, whereField: string, whereOp: string, whereValue: any, user: User) {
+
+interface QueryConstraint {
+    field: string;
+    op: string;
+    value: any;
+}
+
+interface OrderBy {
+    field: string;
+    direction: 'ASC' | 'DESC';
+}
+
+export async function proxyQuery(
+    collectionPath: string,
+    options: {
+        where?: QueryConstraint[];
+        orderBy?: OrderBy[];
+        limit?: number;
+    },
+    user: User
+) {
     const token = await user.getIdToken();
 
-    // RunQuery (POST)
-    // https://firestore.googleapis.com/v1/projects/{projectId}/databases/(default)/documents:runQuery
-
     // Construct StructuredQuery
-    const structuredQuery = {
+    const structuredQuery: any = {
         from: [{ collectionId: collectionPath }],
-        where: {
-            fieldFilter: {
-                field: { fieldPath: whereField },
-                op: 'EQUAL', // mapped from whereOp '=='
-                value: toFirestoreValue(whereValue)
-            }
-        },
-        limit: 1 // We only check existence usually
+        limit: options.limit || 20
     };
+
+    if (options.where && options.where.length > 0) {
+        if (options.where.length === 1) {
+            structuredQuery.where = {
+                fieldFilter: {
+                    field: { fieldPath: options.where[0].field },
+                    op: mapOperator(options.where[0].op),
+                    value: toFirestoreValue(options.where[0].value)
+                }
+            };
+        } else {
+            structuredQuery.where = {
+                compositeFilter: {
+                    op: 'AND',
+                    filters: options.where.map(w => ({
+                        fieldFilter: {
+                            field: { fieldPath: w.field },
+                            op: mapOperator(w.op),
+                            value: toFirestoreValue(w.value)
+                        }
+                    }))
+                }
+            };
+        }
+    }
+
+    if (options.orderBy && options.orderBy.length > 0) {
+        structuredQuery.orderBy = options.orderBy.map(o => ({
+            field: { fieldPath: o.field },
+            direction: o.direction === 'ASC' ? 'ASCENDING' : 'DESCENDING'
+        }));
+    }
 
     const res = await fetch('/api/proxy/firestore', {
         method: 'POST',
@@ -221,7 +263,7 @@ export async function proxyQuery(collectionPath: string, whereField: string, whe
             'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-            path: ':runQuery', // Special path for query
+            path: ':runQuery',
             method: 'POST',
             data: { structuredQuery }
         })
@@ -231,16 +273,10 @@ export async function proxyQuery(collectionPath: string, whereField: string, whe
         throw new Error(`Proxy Query Failed: ${res.statusText}`);
     }
 
-    const data = await res.json(); // Array of results or empty
-    // each item has `document` or `readTime` (if empty?)
-    // data is array of objects like { document: { ... }, readTime: ... }
+    const data = await res.json();
 
-    // If no match, it might return array with just timestamps or empty array?
-    // "If no documents match, the response will be empty (or contain only read time if configured)"
+    if (!Array.isArray(data)) return { empty: true, docs: [] };
 
-    if (!Array.isArray(data)) return { empty: true, docs: [] }; // Should act as snapshot.docs
-
-    // filter out items without `document`
     const docs = data.filter((item: any) => item.document).map((item: any) => ({
         id: item.document.name.split('/').pop(),
         data: () => fromFirestoreDoc(item.document)
@@ -250,4 +286,18 @@ export async function proxyQuery(collectionPath: string, whereField: string, whe
         empty: docs.length === 0,
         docs
     };
+}
+
+function mapOperator(op: string) {
+    switch (op) {
+        case '==': return 'EQUAL';
+        case '<': return 'LESS_THAN';
+        case '<=': return 'LESS_THAN_OR_EQUAL';
+        case '>': return 'GREATER_THAN';
+        case '>=': return 'GREATER_THAN_OR_EQUAL';
+        case 'array-contains': return 'ARRAY_CONTAINS';
+        case 'in': return 'IN';
+        case 'array-contains-any': return 'ARRAY_CONTAINS_ANY';
+        default: return 'EQUAL';
+    }
 }

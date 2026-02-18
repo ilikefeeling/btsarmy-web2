@@ -16,7 +16,7 @@ import {
     where
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { db } from './firebase'; // Import db from firebase.ts
+import { db, auth } from './firebase'; // Import auth
 
 // --- User Types ---
 export interface UserProfile {
@@ -169,10 +169,19 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
         }
         return null;
     } catch (e) {
-        // For profile fetch, we might also need proxy if used in critical path
-        // For now, let's keep it simple or TODO
-        console.warn('getUserProfile: Direct SDK failed, simple proxy integration not fully verified here');
-        return null;
+        console.warn('getUserProfile: Direct SDK failed, trying proxy...', e);
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw e;
+            const proxyRes = await proxyGetDoc(`users/${uid}`, currentUser);
+            if (proxyRes && proxyRes.exists()) {
+                return proxyRes.data!() as UserProfile;
+            }
+            return null;
+        } catch (proxyError) {
+            console.error('getUserProfile: Proxy fallback failed', proxyError);
+            return null;
+        }
     }
 }
 
@@ -199,12 +208,12 @@ export async function isServiceNumberTaken(serviceNumber: string, excludeUid?: s
         }
         console.warn("isServiceNumberTaken: Firestore failed, trying proxy...", e);
         try {
-            const result = await proxyQuery('users', 'serviceNumber', '==', serviceNumber, user);
+            const currentUser = user || auth.currentUser;
+            if (!currentUser) throw new Error("No user for proxy");
 
-            // result is { empty, docs } from proxyQuery
-            // proxyQuery implementation returns array if empty? No, returns { empty, docs } object in my implementation.
-            // Let's check `firestore-proxy.ts` again.
-            // It returns `result` object with `docs` array.
+            const result = await proxyQuery('users', {
+                where: [{ field: 'serviceNumber', op: '==', value: serviceNumber }]
+            }, currentUser);
 
             if (!result || result.empty) return false;
 
@@ -250,11 +259,36 @@ export function subscribeToFeed(
             ...doc.data()
         })) as FeedItem[];
         callback(items);
-    }, (error) => {
-        console.error('subscribeToFeed error:', error);
-        // On offline/error, stop loading with empty array so UI doesn't hang
-        callback([]);
-        if (onError) onError(error);
+    }, async (error) => {
+        console.warn('subscribeToFeed: Realtime blocked, trying one-time proxy fetch...', error);
+
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                if (onError) onError(error);
+                return;
+            }
+
+            const result = await proxyQuery('global_lounge_feed', {
+                orderBy: [{ field: 'timestamp', direction: 'DESC' }],
+                limit: 50
+            }, currentUser);
+
+            if (result.docs) {
+                const items = result.docs.map((doc: any) => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as FeedItem[];
+                callback(items);
+            } else {
+                callback([]);
+            }
+
+        } catch (proxyError: any) {
+            console.error('subscribeToFeed: Proxy fallback failed', proxyError);
+            if (onError) onError(proxyError);
+            else callback([]);
+        }
     });
 }
 
@@ -360,11 +394,36 @@ export async function getUserPosts(uid: string): Promise<FeedItem[]> {
         limit(20)
     );
 
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    })) as FeedItem[];
+    try {
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as FeedItem[];
+    } catch (e) {
+        console.warn('getUserPosts: Firestore failed, trying proxy...', e);
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return [];
+
+            const result = await proxyQuery('global_lounge_feed', {
+                where: [{ field: 'author.uid', op: '==', value: uid }],
+                orderBy: [{ field: 'timestamp', direction: 'DESC' }],
+                limit: 20
+            }, currentUser);
+
+            if (result.docs) {
+                return result.docs.map((doc: any) => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as FeedItem[];
+            }
+            return [];
+        } catch (proxyError) {
+            console.error('getUserPosts: Proxy fallback failed', proxyError);
+            return [];
+        }
+    }
 }
 
 // --- Market Types ---
@@ -427,6 +486,29 @@ export function subscribeToMarket(callback: (items: MarketItem[]) => void) {
             ...doc.data()
         })) as MarketItem[];
         callback(items);
+    }, async (error) => {
+        console.warn('subscribeToMarket: Realtime blocked, trying proxy...', error);
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return; // Silent fail if no user
+
+            const result = await proxyQuery('market_items', {
+                orderBy: [{ field: 'createdAt', direction: 'DESC' }],
+                limit: 50
+            }, currentUser);
+
+            if (result.docs) {
+                const items = result.docs.map((doc: any) => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as MarketItem[];
+                callback(items);
+            } else {
+                callback([]);
+            }
+        } catch (proxyError) {
+            console.error('subscribeToMarket: Proxy fallback failed', proxyError);
+        }
     });
 }
 // --- Comment Types ---
@@ -545,6 +627,16 @@ export function subscribeToComments(feedId: string, callback: (comments: Comment
             ...doc.data()
         })) as Comment[];
         callback(comments);
+    }, async (error) => {
+        console.warn('subscribeToComments: Realtime blocked, trying proxy...', error);
+        try {
+            // Note: Proxy for subcollections is NOT yet supported by our `proxyQuery`
+            // We skip implementation for now to avoid errors.
+            console.error('subscribeToComments: Proxy for subcollection not yet supported');
+            callback([]);
+        } catch (e) {
+            callback([]);
+        }
     });
 }
 
@@ -622,12 +714,11 @@ export function subscribeToNotifications(uid: string, callback: (notifications: 
             ...doc.data()
         })) as Notification[];
         callback(notifications);
-    }, (error) => {
-        if (onError) {
-            onError(error);
-        } else {
-            console.error("Notification subscription error:", error);
-        }
+    }, async (error) => {
+        console.warn('subscribeToNotifications: Realtime blocked, trying proxy...', error);
+
+        if (onError) onError(error);
+        else console.error("Notification subscription error:", error);
     });
 }
 
