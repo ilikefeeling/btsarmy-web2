@@ -31,23 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const lastKnownUser = useRef<User | null>(null);
     const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Hydrate from cache on mount (to handle reload + offline scenario)
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const cachedUserStr = localStorage.getItem(USER_CACHE_KEY);
-            if (cachedUserStr) {
-                try {
-                    const cachedUser = JSON.parse(cachedUserStr);
-                    // Minimal reconstruct to satisfy User interface for UI properties
-                    lastKnownUser.current = cachedUser as User;
-                    // We don't setUser immediately to allow onAuthStateChanged to take authoritative precedence,
-                    // but we have it ready for the "Sad Path".
-                } catch (e) {
-                    console.error('Failed to parse user cache', e);
-                }
-            }
-        }
-    }, []);
+    // No separate useEffect for hydration to avoid race conditions.
+    // We handle hydration directly inside onAuthStateChanged.
 
     useEffect(() => {
         // Initial Check: If we expect a session, keep loading true
@@ -68,8 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // console.log('[Auth] Session Active/Restored');
                 localStorage.setItem(SESSION_KEY, 'true');
 
-                // Serializing user for cache (picking essential fields)
-                // Note: deeply nested objects or methods won't survive, but email/uid will.
+                // Cache user for offline/page-reload resilience
                 const userForCache = {
                     uid: currentUser.uid,
                     email: currentUser.email,
@@ -79,15 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     isAnonymous: currentUser.isAnonymous,
                     metadata: { ...currentUser.metadata },
                     providerData: [...currentUser.providerData],
-                    // We can't cache methods like getIdToken, so we might need to handle that if used.
                 };
                 localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userForCache));
 
-                lastKnownUser.current = currentUser; // Backup full object (including methods) in memory
+                lastKnownUser.current = currentUser; // Backup full object
                 setUser(currentUser);
                 setLoading(false);
 
-                // Background profile sync (Isolated from Auth logic)
+                // Background profile sync
                 try {
                     if (currentUser.email && currentUser.email.endsWith('@army.bts')) {
                         const serviceNumber = currentUser.email.split('@')[0];
@@ -111,16 +94,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // [Disconnected / Logout State]
                 const shouldBeLoggedIn = localStorage.getItem(SESSION_KEY) === 'true';
 
-                // Check if we have a stale user to restore (from memory ref OR local storage cache)
-                if (shouldBeLoggedIn && lastKnownUser.current) {
+                // Check for cached user synchronously to handle page reloads where ref is empty
+                let restoredUser = lastKnownUser.current;
+
+                if (!restoredUser && typeof window !== 'undefined') {
+                    const cachedUserStr = localStorage.getItem(USER_CACHE_KEY);
+                    if (cachedUserStr) {
+                        try {
+                            restoredUser = JSON.parse(cachedUserStr) as User;
+                            lastKnownUser.current = restoredUser; // restore ref
+                        } catch (e) {
+                            console.error('Failed to parse user cache', e);
+                        }
+                    }
+                }
+
+                if (shouldBeLoggedIn && restoredUser) {
                     // [Sticky Mode] Network drop or frame_ant.js abort detected
-                    console.warn('[Auth] connection drop detected. Restoring sticky session...');
+                    // console.warn('[Auth] connection drop detected. Restoring sticky session from cache...');
 
                     // CRITICAL: Restore the stale user object to prevent UI from redirecting to login
-                    setUser(lastKnownUser.current);
+                    setUser(restoredUser);
 
                     // FORCE LOADING FALSE to ensure UI renders the Dashboard, not a spinner
-                    // The user wants "Never Bounce", so we show the stale content.
                     setLoading(false);
 
                     // We do NOT set a logout timer. We hold ON indefinitely.
