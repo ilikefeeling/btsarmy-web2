@@ -21,6 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 const SESSION_KEY = 'army_session_active';
+const USER_CACHE_KEY = 'army_user_cache';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -29,6 +30,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Sticky Session: Keep track of the last user to restore if network flickers
     const lastKnownUser = useRef<User | null>(null);
     const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Hydrate from cache on mount (to handle reload + offline scenario)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const cachedUserStr = localStorage.getItem(USER_CACHE_KEY);
+            if (cachedUserStr) {
+                try {
+                    const cachedUser = JSON.parse(cachedUserStr);
+                    // Minimal reconstruct to satisfy User interface for UI properties
+                    lastKnownUser.current = cachedUser as User;
+                    // We don't setUser immediately to allow onAuthStateChanged to take authoritative precedence,
+                    // but we have it ready for the "Sad Path".
+                } catch (e) {
+                    console.error('Failed to parse user cache', e);
+                }
+            }
+        }
+    }, []);
 
     useEffect(() => {
         // Initial Check: If we expect a session, keep loading true
@@ -48,7 +67,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // [Healthy State]
                 // console.log('[Auth] Session Active/Restored');
                 localStorage.setItem(SESSION_KEY, 'true');
-                lastKnownUser.current = currentUser; // Backup
+
+                // Serializing user for cache (picking essential fields)
+                // Note: deeply nested objects or methods won't survive, but email/uid will.
+                const userForCache = {
+                    uid: currentUser.uid,
+                    email: currentUser.email,
+                    displayName: currentUser.displayName,
+                    photoURL: currentUser.photoURL,
+                    emailVerified: currentUser.emailVerified,
+                    isAnonymous: currentUser.isAnonymous,
+                    metadata: { ...currentUser.metadata },
+                    providerData: [...currentUser.providerData],
+                    // We can't cache methods like getIdToken, so we might need to handle that if used.
+                };
+                localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userForCache));
+
+                lastKnownUser.current = currentUser; // Backup full object (including methods) in memory
                 setUser(currentUser);
                 setLoading(false);
 
@@ -76,22 +111,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // [Disconnected / Logout State]
                 const shouldBeLoggedIn = localStorage.getItem(SESSION_KEY) === 'true';
 
-                // Check if we have a stale user to restore
+                // Check if we have a stale user to restore (from memory ref OR local storage cache)
                 if (shouldBeLoggedIn && lastKnownUser.current) {
                     // [Sticky Mode] Network drop or frame_ant.js abort detected
                     console.warn('[Auth] connection drop detected. Restoring sticky session...');
 
                     // CRITICAL: Restore the stale user object to prevent UI from redirecting to login
-                    // This keeps the user "logged in" from the UI perspective
                     setUser(lastKnownUser.current);
-                    setLoading(true); // set loading true to indicate "unstable" but verified session
 
-                    // We do NOT set a logout timer. We hold ON.
+                    // FORCE LOADING FALSE to ensure UI renders the Dashboard, not a spinner
+                    // The user wants "Never Bounce", so we show the stale content.
+                    setLoading(false);
+
+                    // We do NOT set a logout timer. We hold ON indefinitely.
                 } else {
                     // [Clean Logout]
                     setUser(null);
                     setLoading(false);
                     lastKnownUser.current = null;
+                    localStorage.removeItem(USER_CACHE_KEY); // Clean up cache
                 }
             }
         }, (error) => {
@@ -129,8 +167,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = async () => {
         try {
-            // Explicit user intent: Remove marker FIRST
+            // Explicit user intent: Remove markers FIRST
             localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(USER_CACHE_KEY);
             lastKnownUser.current = null; // Clear backup
             if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
 
