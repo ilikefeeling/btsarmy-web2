@@ -175,6 +175,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
             if (!currentUser) throw e;
             const proxyRes = await proxyGetDoc(`users/${uid}`, currentUser);
             if (proxyRes && proxyRes.exists()) {
+                console.error(`[db.ts v2] getUserProfile: Proxy fallback SUCCESS for ${uid}`);
                 return proxyRes.data!() as UserProfile;
             }
             return null;

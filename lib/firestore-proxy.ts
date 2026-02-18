@@ -75,9 +75,29 @@ export function fromFirestoreDoc(doc: any) {
 }
 
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fetch(url, options);
+            return res;
+        } catch (err: any) {
+            console.error(`[Proxy v2] Request attempt ${i + 1} failed: ${err.name} - ${err.message}`);
+            if (i === retries - 1) throw err;
+            // Retry on AbortError or Network errors
+            if (err.name === 'AbortError' || err.message.includes('Failed to fetch') || err.message.includes('Network request failed')) {
+                await new Promise(r => setTimeout(r, backoff * (i + 1)));
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw new Error('Fetch failed after retries');
+}
+
 export async function proxyGetDoc(path: string, user: User) {
+    console.error(`[Proxy v2] Starting GET for ${path}`);
     const token = await user.getIdToken();
-    const res = await fetch('/api/proxy/firestore', {
+    const res = await fetchWithRetry('/api/proxy/firestore', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -88,6 +108,7 @@ export async function proxyGetDoc(path: string, user: User) {
             method: 'GET'
         })
     });
+    console.error(`[Proxy v2] GET request sent for ${path}, status: ${res.status}`);
 
     if (!res.ok) {
         if (res.status === 404) return { exists: () => false };
@@ -175,7 +196,7 @@ export async function proxySetDoc(path: string, data: any, user: User, merge: bo
         queryParams['updateMask.fieldPaths'] = fieldPaths;
     }
 
-    const res = await fetch('/api/proxy/firestore', {
+    const res = await fetchWithRetry('/api/proxy/firestore', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -186,6 +207,7 @@ export async function proxySetDoc(path: string, data: any, user: User, merge: bo
             queryParams: merge ? queryParams : undefined
         })
     });
+    console.error(`[Proxy v2] SET request sent for ${path}, status: ${res.status}`);
 
     if (!res.ok) {
         const errorData = await res.json();
@@ -216,6 +238,7 @@ export async function proxyQuery(
     },
     user: User
 ) {
+    console.error(`[Proxy v2] Starting QUERY for ${collectionPath}`);
     const token = await user.getIdToken();
 
     // Construct StructuredQuery
@@ -256,7 +279,7 @@ export async function proxyQuery(
         }));
     }
 
-    const res = await fetch('/api/proxy/firestore', {
+    const res = await fetchWithRetry('/api/proxy/firestore', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -268,6 +291,7 @@ export async function proxyQuery(
             data: { structuredQuery }
         })
     });
+    console.error(`[Proxy v2] QUERY request sent for ${collectionPath}, status: ${res.status}`);
 
     if (!res.ok) {
         throw new Error(`Proxy Query Failed: ${res.statusText}`);

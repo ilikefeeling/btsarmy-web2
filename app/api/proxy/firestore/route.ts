@@ -18,7 +18,15 @@ export async function POST(request: NextRequest) {
         let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
 
         if (queryParams) {
-            const params = new URLSearchParams(queryParams);
+            const params = new URLSearchParams();
+            Object.keys(queryParams).forEach(key => {
+                const value = queryParams[key];
+                if (Array.isArray(value)) {
+                    value.forEach(v => params.append(key, v));
+                } else {
+                    params.append(key, String(value));
+                }
+            });
             url += `?${params.toString()}`;
         }
 

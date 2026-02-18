@@ -162,7 +162,7 @@ export default function LoginPage() {
 
             <div className="text-[10px] text-center text-gray-600 mt-6">
               Official Army App Authentication Protocol <br />
-              Secure Gateway v2.0
+              Secure Gateway v2.1 (Debug Mode)
             </div>
           </form>
         </div>
