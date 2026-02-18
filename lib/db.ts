@@ -1,5 +1,4 @@
-import {
-    doc,
+doc,
     getDoc,
     setDoc,
     updateDoc,
@@ -12,11 +11,21 @@ import {
     limit,
     Timestamp,
     getDocs,
-    deleteDoc, // Import deleteDoc
-    where
+    deleteDoc,
+    where,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { db } from './firebase';
+import { app } from './firebase'; // Import app from firebase.ts
+
+// Initialize Firestore with settings for offline persistence and long-polling
+// This fixes "client is offline" issues in restrictive networks (e.g. corporate firewalls, in-app browsers)
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    experimentalForceLongPolling: true, // Force long-polling to bypass proxy/firewall issues
+});
 
 // --- User Types ---
 export interface UserProfile {
