@@ -13,26 +13,25 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Debug: Check if config is loaded
-if (typeof window !== 'undefined') {
-    console.error("Firebase Config Debug (Please Check):", {
-        apiKey: firebaseConfig.apiKey ? "Present" : "MISSING",
-        authDomain: firebaseConfig.authDomain ? "Present" : "MISSING",
-        projectId: firebaseConfig.projectId ? "Present" : "MISSING",
-        storageBucket: firebaseConfig.storageBucket ? "Present" : "MISSING",
-        appId: firebaseConfig.appId ? "Present" : "MISSING",
-    });
-}
-
 // Initialize Firebase (Singleton pattern)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-// Initialize Firestore with settings for offline persistence and long-polling
-// This fixes "client is offline" issues in restrictive networks (e.g. corporate firewalls, in-app browsers)
-export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: true, // Force long-polling to bypass proxy/firewall issues
-});
+
+// Initialize Firestore with long-polling (singleton-safe)
+// initializeFirestore can only be called once per app instance
+let db: ReturnType<typeof getFirestore>;
+try {
+    db = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+    });
+} catch {
+    // Already initialized - get the existing instance
+    db = getFirestore(app);
+}
+
+export { db };
 export const storage = getStorage(app);
 export { app };
 export default app;
+
