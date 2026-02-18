@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -28,6 +28,11 @@ if (typeof window !== 'undefined') {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Initialize Firestore with settings for offline persistence and long-polling
+// This fixes "client is offline" issues in restrictive networks (e.g. corporate firewalls, in-app browsers)
+export const db = initializeFirestore(app, {
+    experimentalForceLongPolling: true, // Force long-polling to bypass proxy/firewall issues
+});
 export const storage = getStorage(app);
+export { app };
 export default app;
