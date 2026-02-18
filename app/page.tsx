@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Music, ShieldCheck, KeyRound } from 'lucide-react';
+import { Loader2, Music, ShieldCheck, KeyRound, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
@@ -16,6 +16,30 @@ export default function LoginPage() {
   const [serviceNumber, setServiceNumber] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
+
+  // Offline detection
+  useEffect(() => {
+    // Initial check
+    setIsOffline(!navigator.onLine);
+
+    const handleOnline = () => {
+      setIsOffline(false);
+      setError(''); // Clear offline error if any
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      setError('네트워크 연결이 끊겼습니다. 인터넷 상태를 확인해주세요.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -36,11 +60,16 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isOffline) {
+      setError('오프라인 상태입니다. 네트워크 연결을 확인해주세요.');
+      return;
+    }
+
     setError('');
     setIsLoggingIn(true);
 
     if (serviceNumber.length < 9) { // 0000-0000 is 9 chars
-      setError('Invalid Service Number format.');
+      setError('서비스 번호 형식이 올바르지 않습니다.');
       setIsLoggingIn(false);
       return;
     }
@@ -51,17 +80,23 @@ export default function LoginPage() {
       } else {
         await loginWithServiceNumber(serviceNumber, password);
       }
+      // Success - router.push will happen via useEffect or auth context
       router.push('/dashboard');
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('Auth failed:', err);
-      // Firebase error codes
-      const firebaseError = err as { code?: string };
-      if (firebaseError.code === 'auth/invalid-credential' || firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/wrong-password') {
-        setError('Invalid Service Number or Password.');
-      } else if (firebaseError.code === 'auth/email-already-in-use') {
-        setError('This Service Number is already active.');
+
+      // Detailed Error Handling
+      const errorCode = err.code || '';
+      const errorMessage = err.message || '';
+
+      if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
+        setError('서비스 번호 또는 비밀번호가 일치하지 않습니다.');
+      } else if (errorCode === 'auth/email-already-in-use') {
+        setError('이미 등록된 서비스 번호입니다.');
+      } else if (errorMessage.includes('offline') || errorMessage.includes('network') || err.name === 'AbortError') {
+        setError('네트워크 연결이 불안정합니다. (Offline/Proxy Fail)');
       } else {
-        setError('Authentication failed. Please try again.');
+        setError(`인증 실패: ${errorMessage.substring(0, 50)}...`);
       }
       setIsLoggingIn(false);
     }
@@ -74,6 +109,15 @@ export default function LoginPage() {
           <Loader2 className="w-10 h-10 text-bts-purple animate-spin" />
         </div>
       )}
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="absolute top-0 left-0 w-full bg-red-600/90 text-white text-xs font-bold py-2 px-4 flex items-center justify-center z-50 animate-pulse">
+          <WifiOff className="w-4 h-4 mr-2" />
+          오프라인 상태 - 기능이 제한될 수 있습니다.
+        </div>
+      )}
+
       {/* Background Ambience */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-bts-purple/20 rounded-full blur-[100px] animate-pulse" />
@@ -137,7 +181,7 @@ export default function LoginPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoggingIn || !serviceNumber || !password}
+              disabled={isLoggingIn || !serviceNumber || !password || isOffline}
               className={cn(
                 "w-full flex items-center justify-center gap-2 py-4 font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4",
                 isRegisterMode
@@ -146,7 +190,7 @@ export default function LoginPage() {
               )}
             >
               {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-              <span>{isLoggingIn ? 'Verifying...' : (isRegisterMode ? 'Issue New ID' : 'Access Command Center')}</span>
+              <span>{isLoggingIn ? 'Verifying...' : (isRegisterMode ? 'Issue New ID' : (isOffline ? 'Offline Mode' : 'Access Command Center'))}</span>
             </button>
 
             {/* Toggle Register Mode (For testing purposes) */}
@@ -162,7 +206,7 @@ export default function LoginPage() {
 
             <div className="text-[10px] text-center text-gray-600 mt-6">
               Official Army App Authentication Protocol <br />
-              Secure Gateway v2.1 (Debug Mode)
+              Secure Gateway v2.2 (Offline Logic Applied)
             </div>
           </form>
         </div>
