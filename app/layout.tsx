@@ -35,6 +35,8 @@ export const viewport: Viewport = {
 
 import { LanguageProvider } from "@/contexts/LanguageContext";
 
+import HydrationGuard from "@/components/HydrationGuard";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -45,12 +47,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LanguageProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-          <Footer />
-        </LanguageProvider>
+        <HydrationGuard>
+          <LanguageProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+            <Footer />
+          </LanguageProvider>
+        </HydrationGuard>
       </body>
     </html>
   );
