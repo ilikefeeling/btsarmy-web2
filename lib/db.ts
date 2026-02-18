@@ -60,30 +60,48 @@ export interface FeedItem {
 
 // --- User Operations ---
 
+import { proxyGetDoc, proxySetDoc, proxyQuery } from './firestore-proxy';
+
 export async function saveUser(user: User, serviceNumber?: string) {
     if (!user) return;
 
     const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
+    let userSnap: any;
+    let isOffline = false;
+
+    // 1. Try connect to Firestore (Direct SDK)
+    try {
+        userSnap = await getDoc(userRef);
+    } catch (error: any) {
+        console.warn('Direct Firestore connection failed, trying proxy...', error);
+        isOffline = true;
+        // Fallback to Proxy
+        try {
+            const proxyRes = await proxyGetDoc(`users/${user.uid}`, user);
+            userSnap = {
+                exists: proxyRes.exists,
+                data: proxyRes.data
+            };
+        } catch (proxyError) {
+            console.error('Proxy fallback also failed:', proxyError);
+            throw error; // Throw original error if proxy fails too
+        }
+    }
 
     if (!userSnap.exists()) {
-        // Determine Service Number
-        // If not provided (e.g. legacy google login if allowed, or extracted from email), try to extract or default
+        // ... (Same Logic) ...
         let finalServiceNumber = serviceNumber || '';
         if (!finalServiceNumber && user.email && user.email.endsWith('@army.bts')) {
             finalServiceNumber = user.email.split('@')[0];
         }
 
-        // Check availability
-        const taken = await isServiceNumberTaken(finalServiceNumber, user.uid);
+        const taken = await isServiceNumberTaken(finalServiceNumber, user.uid, user);
         if (taken) {
             throw new Error(`Service Number ${finalServiceNumber} is already in use by another account.`);
         }
 
-        // Auto-assign Admin Role for specific ID
         const role = finalServiceNumber === '0000-0000' ? 'admin' : 'user';
 
-        // Create new profile
         const newProfile: UserProfile = {
             uid: user.uid,
             email: user.email,
@@ -92,61 +110,113 @@ export async function saveUser(user: User, serviceNumber?: string) {
             rank: 'Recruit',
             role: role,
             serviceNumber: finalServiceNumber,
-            country: 'KR', // Default, should detect from IP or ask user
+            country: 'KR',
             createdAt: serverTimestamp() as Timestamp,
             lastLogin: serverTimestamp() as Timestamp,
         };
-        await setDoc(userRef, newProfile);
+
+        // Create Profile
+        if (!isOffline) {
+            await setDoc(userRef, newProfile);
+        } else {
+            // Proxy Create (Overwrite)
+            // Need to convert timestamps manually for REST? 
+            // Our toFirestoreValue converts Date to timestampValue. 
+            // serverTimestamp() is an object passed to SDK, but Proxy expects actual data or Date.
+            // We replace serverTimestamp() with new Date().
+            const proxyData = {
+                ...newProfile,
+                createdAt: new Date(),
+                lastLogin: new Date()
+            };
+            await proxySetDoc(`users/${user.uid}`, proxyData, user, false);
+        }
     } else {
-        // Update existing profile
+        // Update Profile
         const updates: any = {
             lastLogin: serverTimestamp(),
         };
 
-        // Retroactive Admin Fix for Existing Users
-        const data = userSnap.data();
+        const data = userSnap!.data() as UserProfile;
         if ((data?.serviceNumber === '0000-0000' || user.email?.startsWith('0000-0000')) && data?.role !== 'admin') {
             updates.role = 'admin';
         }
 
-        // If service number is being updated/set and wasn't there before or is different
-        // Only if explicit serviceNumber is passed to saveUser
         if (serviceNumber && data?.serviceNumber !== serviceNumber) {
-            const taken = await isServiceNumberTaken(serviceNumber, user.uid);
+            const taken = await isServiceNumberTaken(serviceNumber, user.uid, user);
             if (taken) {
                 throw new Error(`Service Number ${serviceNumber} is already in use by another account.`);
             }
             updates.serviceNumber = serviceNumber;
         }
 
-        await updateDoc(userRef, updates);
+        if (!isOffline) {
+            await updateDoc(userRef, updates);
+        } else {
+            // Proxy Update (Merge)
+            const proxyUpdates = { ...updates, lastLogin: new Date() };
+            await proxySetDoc(`users/${user.uid}`, proxyUpdates, user, true);
+        }
     }
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-        return userSnap.data() as UserProfile;
+    try {
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+            return userSnap.data() as UserProfile;
+        }
+        return null;
+    } catch (e) {
+        // For profile fetch, we might also need proxy if used in critical path
+        // For now, let's keep it simple or TODO
+        console.warn('getUserProfile: Direct SDK failed, simple proxy integration not fully verified here');
+        return null;
     }
-    return null;
 }
 
-export async function isServiceNumberTaken(serviceNumber: string, excludeUid?: string): Promise<boolean> {
+export async function isServiceNumberTaken(serviceNumber: string, excludeUid?: string, user?: User): Promise<boolean> {
     if (!serviceNumber) return false;
 
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('serviceNumber', '==', serviceNumber));
-    const snapshot = await getDocs(q);
+    // Direct Firestore Call
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('serviceNumber', '==', serviceNumber));
+        const snapshot = await getDocs(q);
 
-    if (snapshot.empty) return false;
+        if (snapshot.empty) return false;
 
-    // If excludeUid is provided, check if the found doc is NOT the current user
-    if (excludeUid) {
-        return snapshot.docs.some(doc => doc.id !== excludeUid);
+        if (excludeUid) {
+            return snapshot.docs.some(doc => doc.id !== excludeUid);
+        }
+        return true;
+    } catch (e) {
+        // Fallback Proxy
+        if (!user) {
+            console.error("isServiceNumberTaken: Firestore failed and no user provided for proxy fallback", e);
+            throw e;
+        }
+        console.warn("isServiceNumberTaken: Firestore failed, trying proxy...", e);
+        try {
+            const result = await proxyQuery('users', 'serviceNumber', '==', serviceNumber, user);
+
+            // result is { empty, docs } from proxyQuery
+            // proxyQuery implementation returns array if empty? No, returns { empty, docs } object in my implementation.
+            // Let's check `firestore-proxy.ts` again.
+            // It returns `result` object with `docs` array.
+
+            if (!result || result.empty) return false;
+
+            if (excludeUid && result.docs) {
+                return result.docs.some((doc: any) => doc.id !== excludeUid);
+            }
+            return true;
+        } catch (proxyError) {
+            console.error("isServiceNumberTaken: Proxy fallback failed", proxyError);
+            throw e;
+        }
     }
-
-    return true;
 }
 
 // --- Admin Operations ---
