@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, getFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, CACHE_SIZE_UNLIMITED, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -36,6 +36,21 @@ export const db = isNewApp
         cacheSizeBytes: CACHE_SIZE_UNLIMITED,
     })
     : getFirestore(app);
+
+// Enable Offline Persistence (Critical for LINE Browser / unstable networks)
+if (typeof window !== 'undefined') {
+    enableIndexedDbPersistence(db).catch((err) => {
+        if (err.code === 'failed-precondition') {
+            console.warn('[Firebase] Multiple tabs open, persistence can only be enabled in one tab at a time.');
+        } else if (err.code === 'unimplemented') {
+            console.warn('[Firebase] The current browser does not support all of the features required to enable persistence');
+        } else if (err.code === 'already-exists') {
+            // Ignore if already enabled
+        } else {
+            console.warn('[Firebase] Persistence enable failed:', err);
+        }
+    });
+}
 
 export const storage = getStorage(app);
 export { app };
