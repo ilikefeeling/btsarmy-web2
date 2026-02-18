@@ -25,7 +25,9 @@ const SESSION_KEY = 'army_session_active';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    // Ref to hold the timeout ID for debounce
+
+    // Sticky Session: Keep track of the last user to restore if network flickers
+    const lastKnownUser = useRef<User | null>(null);
     const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -36,17 +38,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            // Clear any pending logout timer if a user is found
+            // Cancel any pending logout timer if a user is found
             if (logoutTimerRef.current) {
                 clearTimeout(logoutTimerRef.current);
                 logoutTimerRef.current = null;
             }
 
             if (currentUser) {
-                // Happy Path: User is logged in
-                // 1. Mark session as active in LocalStorage
+                // [Healthy State]
+                // console.log('[Auth] Session Active/Restored');
                 localStorage.setItem(SESSION_KEY, 'true');
-
+                lastKnownUser.current = currentUser; // Backup
                 setUser(currentUser);
                 setLoading(false);
 
@@ -54,59 +56,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     if (currentUser.email && currentUser.email.endsWith('@army.bts')) {
                         const serviceNumber = currentUser.email.split('@')[0];
-                        // Resilient token fetch
-                        const idToken = await currentUser.getIdToken().catch(() => null);
-
-                        if (idToken) {
-                            fetch('/api/save-user', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${idToken}`,
-                                },
-                                body: JSON.stringify({ serviceNumber }),
-                            }).catch(err => console.warn('[Validation] Sync postponed:', err.name));
-                        }
+                        // Resilient token fetch: ignore failures
+                        currentUser.getIdToken().then(idToken => {
+                            if (idToken) {
+                                fetch('/api/save-user', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${idToken}`,
+                                    },
+                                    body: JSON.stringify({ serviceNumber }),
+                                }).catch(err => console.warn('[Validation] Sync postponed:', err.name));
+                            }
+                        }).catch(() => { });
                     }
                 } catch { /* Ignore Sync Errors */ }
+
             } else {
-                // Sad Path: User is null (Logout or Session Lost)
-                // Check if we *should* be logged in
+                // [Disconnected / Logout State]
                 const shouldBeLoggedIn = localStorage.getItem(SESSION_KEY) === 'true';
 
-                if (shouldBeLoggedIn) {
-                    // Suspicious Logout (likely Network Abort / frame_ant.js)
-                    console.warn('[Auth] Session lost but LocalStorage says active. delaying logout...');
+                // Check if we have a stale user to restore
+                if (shouldBeLoggedIn && lastKnownUser.current) {
+                    // [Sticky Mode] Network drop or frame_ant.js abort detected
+                    console.warn('[Auth] connection drop detected. Restoring sticky session...');
 
-                    // Do NOT set user to null immediately.
-                    // Wait 3 seconds to see if it recovers (or if it's a real logout, we force it)
-                    // In a real app with 'onAuthStateChanged', it usually doesn't "flicker" null unless it's a real signout or token expiry.
-                    // BUT, if the network is aborted during token refresh, it might emit null.
+                    // CRITICAL: Restore the stale user object to prevent UI from redirecting to login
+                    // This keeps the user "logged in" from the UI perspective
+                    setUser(lastKnownUser.current);
+                    setLoading(true); // set loading true to indicate "unstable" but verified session
 
-                    // If we are really paranoid, we just KEEP the old user if we have one? 
-                    // No, we can't keep a stale user object that might be invalid.
-
-                    // Compromise: Set 'loading' to true to show spinner instead of Login Screen.
-                    setLoading(true);
-
-                    // Set a timeout to accept the logout if it persists
-                    logoutTimerRef.current = setTimeout(() => {
-                        console.warn('[Auth] Session recovery failed. Logging out.');
-                        localStorage.removeItem(SESSION_KEY);
-                        setUser(null);
-                        setLoading(false);
-                    }, 5000); // 5 second grace period
-
+                    // We do NOT set a logout timer. We hold ON.
                 } else {
-                    // Intentional Logout or Initial Load without session
+                    // [Clean Logout]
                     setUser(null);
                     setLoading(false);
+                    lastKnownUser.current = null;
                 }
             }
         }, (error) => {
             console.error('[Auth] Stream Error:', error);
-            // Safety: If stream errors, assume network issue and keep previous state if possible
-            // Do nothing to 'user' or 'loading' if we can avoid it.
+            // Safety: If stream errors, assume network issue and keep previous state
         });
 
         return () => {
@@ -141,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             // Explicit user intent: Remove marker FIRST
             localStorage.removeItem(SESSION_KEY);
+            lastKnownUser.current = null; // Clear backup
             if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
 
             await signOut(auth);
