@@ -1,0 +1,122 @@
+
+> btsarmy-web@0.1.0 lint
+> eslint
+
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\admin\layout.tsx
+  6:26  warning  'UserProfile' is defined but never used  @typescript-eslint/no-unused-vars
+  8:30  warning  'BarChart' is defined but never used     @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\admin\page.tsx
+  9:12  warning  'loading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\admin\users\page.tsx
+   5:18  warning  'Shield' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   5:26  warning  'MoreVertical' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  22:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\admin\users\page.tsx:22:9
+  20 |
+  21 |     useEffect(() => {
+> 22 |         fetchUsers();
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  23 |     }, []);
+  24 |
+  25 |     const handleRankUpdate = async (uid: string, currentRank: string) => {  react-hooks/set-state-in-effect
+  31:51  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\archive\page.tsx
+  2:10  warning  'cn' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\chat\page.tsx
+    9:14  warning  'ImageIcon' is defined but never used                            @typescript-eslint/no-unused-vars
+  127:41  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  127:50  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\guide\page.tsx
+   1:10   warning  'Book' is defined but never used                                 @typescript-eslint/no-unused-vars
+  51:77   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  53:51   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  53:64   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  54:56   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  59:80   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  89:113  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  89:123  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\healing\page.tsx
+  11:21  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  12:24  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  12:42  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  12:59  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\layout.tsx
+  7:5  warning  'Users' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\market\new\page.tsx
+  43:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\market\page.tsx
+   9:5  warning  'Filter' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  10:5  warning  'SlidersHorizontal' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  48:9  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\market\page.tsx:48:9
+  46 |         }
+  47 |
+> 48 |         setFilteredItems(result);
+     |         ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  49 |     }, [activeCategory, searchTerm, items]);
+  50 |
+  51 |     return (  react-hooks/set-state-in-effect
+
+C:\Users\PC2301\Desktop\btsarmy-web\app\dashboard\page.tsx
+  184:41  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  184:50  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\PC2301\Desktop\btsarmy-web\components\ServiceGate.tsx
+  31:18  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\components\market\MarketCard.tsx
+  2:17  warning  'MessageCircle' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\components\market\ProductCard.tsx
+   3:8   warning  'Image' is defined but never used           @typescript-eslint/no-unused-vars
+  22:27  warning  'image' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC2301\Desktop\btsarmy-web\components\ui\AdBanner.tsx
+  23:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\PC2301\Desktop\btsarmy-web\components\ui\AdBanner.tsx:23:13
+  21 |         // Check if we are in development environment
+  22 |         if (process.env.NODE_ENV === 'development') {
+> 23 |             setIsDev(true);
+     |             ^^^^^^^^ Avoid calling setState() directly within an effect
+  24 |         } else {
+  25 |             // Load AdSense script if not already loaded
+  26 |             // This is a simplified example. In production, you'd likely use a library or a more robust script loader  react-hooks/set-state-in-effect
+  28:17  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/ban-ts-comment
+
+C:\Users\PC2301\Desktop\btsarmy-web\lib\auth.ts
+   4:11  warning  'UserProfile' is defined but never used    @typescript-eslint/no-unused-vars
+  38:45  warning  'serviceNumber' is defined but never used  @typescript-eslint/no-unused-vars
+
+??38 problems (21 errors, 17 warnings)
+

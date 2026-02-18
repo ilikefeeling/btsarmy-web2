@@ -1,0 +1,21 @@
+
+> btsarmy-web@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.3s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/15) ...
+Error occurred prerendering page "/_not-found". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: Attempted to call useLanguage() from the server but useLanguage is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.
+    at <unknown> (C:\Users\PC2301\Desktop\btsarmy-web\.next\server\chunks\ssr\[root-of-the-server]__c627ba7c._.js:1:5955)
+    at n (C:\Users\PC2301\Desktop\btsarmy-web\.next\server\chunks\ssr\[root-of-the-server]__c627ba7c._.js:1:7571)
+    at stringify (<anonymous>) {
+  digest: '4160233872'
+}
+Export encountered an error on /_not-found/page: /_not-found, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
