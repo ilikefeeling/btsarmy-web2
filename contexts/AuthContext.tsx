@@ -133,8 +133,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Safety: If stream errors, assume network issue and keep previous state
         });
 
+        // Storage Event Listener: Handle cross-tab login/logout
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === SESSION_KEY) {
+                if (e.newValue === 'true') {
+                    // Another tab signaled login. onAuthStateChanged will handle the user object,
+                    // but we ensure loading state is cleared if it was stuck.
+                    // console.log('[Auth] Detected login from another tab');
+                } else if (!e.newValue) {
+                    // Another tab signaled logout. Clear state immediately.
+                    // console.log('[Auth] Detected logout from another tab');
+                    setUser(null);
+                    lastKnownUser.current = null;
+                }
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+
         return () => {
             unsubscribe();
+            window.removeEventListener('storage', handleStorageChange);
             if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
         };
     }, []);

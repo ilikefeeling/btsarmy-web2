@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Footer from "@/components/layout/Footer";
+import Script from "next/script";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +25,11 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "BTS Army",
   },
+  other: {
+    "google-adsense-account": "ca-pub-5225442926231030",
+  },
 };
+
 
 export const viewport: Viewport = {
   themeColor: "#7A00B7",
@@ -48,6 +54,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5225442926231030"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+
         <script
           dangerouslySetInnerHTML={{
             __html: `

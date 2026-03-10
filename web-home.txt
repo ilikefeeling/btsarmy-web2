@@ -1,0 +1,14 @@
+
+web
+www.bts-army.app
+
+Vercel 
+btsarmy-web2
+
+GitHub 푸시와 Vercel 배포
+배포 주소: https://btsarmy-web2.vercel.app
+
+firebase
+프로젝트 이름	BTS-ARMY
+프로젝트 ID	bts-army-a9935
+프로젝트 번호	907376520978
